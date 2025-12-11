@@ -20,6 +20,10 @@ int ::= ... | -1 | 0 | 1 | ...
 
 -- Logging language
 -- =============================================================================
+{-# NOINLINE fatal #-}
+
+{-# RULES "exit" forall s m. fatal s >> m = fatal s #-}
+
 data LogF a b
   = Debug a b
   | Info String b
