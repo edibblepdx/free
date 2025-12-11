@@ -203,7 +203,9 @@ compile o (Div e1 e2) = do
   y <- compile o e2
   when (logInfo o) $
     inj (info $ "Div " ++ show x ++ " " ++ show y)
-  when (logDebug o) $
+  when (y == 0 && logFatal o) $
+    inj (fatal "divide by zero")
+  when (y /= 0 && logDebug o) $
     inj (debug $ x `div` y)
   inj $ x `div1` y
 compile o (Pow e1 e2) = do
@@ -305,7 +307,7 @@ wrap s = "(" ++ s ++ ")"
 
 -- default compile flags
 dflags :: CompileFlags
-dflags = CompileFlags True True False
+dflags = CompileFlags True True True
 
 run :: CompileFlags -> String -> IO Int
 run o = eval . compile o . parse1
