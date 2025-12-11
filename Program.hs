@@ -20,6 +20,7 @@ int ::= ... | -1 | 0 | 1 | ...
 
 -- Logging language
 -- =============================================================================
+
 {-# NOINLINE fatal #-}
 
 {-# RULES "exit" forall s m. fatal s >> m = fatal s #-}
