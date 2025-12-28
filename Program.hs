@@ -18,9 +18,11 @@ factor ::= ( expr ) | int
 int ::= ... | -1 | 0 | 1 | ...
 -}
 
+-- Combined DSL
+type Program = Free (LogF Int :+: ExprF)
+
 -- Logging language
 -- =============================================================================
-
 {-# NOINLINE fatal #-}
 
 {-# RULES "exit" forall s m. fatal s >> m = fatal s #-}
@@ -83,9 +85,6 @@ div1 n m = liftF $ Div1 n m id
 
 pow :: Int -> Int -> Expr Int
 pow n m = liftF $ Pow1 n m id
-
--- Combined language
-type Program = Free (LogF Int :+: ExprF)
 
 -- Abstract syntax tree
 -- =============================================================================
@@ -166,9 +165,8 @@ parse1 xs = case parse expr xs of
   [(_, out)] -> error ("Unused input " ++ out)
   [] -> error "invalid input"
 
--- compile an abstract syntax tree into a free monad
+-- Compile an abstract syntax tree into a free monad
 -- =============================================================================
-
 data CompileFlags = CompileFlags
   { logDebug :: Bool,
     logInfo :: Bool,
@@ -226,15 +224,18 @@ compile o (Par e) = do
 
 -- decompile program
 -- Still need to figure this out
+-- I think it might not be possible since the program is a linear structure and
+-- the compiled programs loses information like parenthesis and adds information
+-- like logging
 decompile :: Program Int -> Tree
 decompile (Pure n) = Val n
 decompile (Free (InR x)) = case x of
   Val1 n k -> decompile (k n)
-  Add1 n m k -> Add (decompile (k n)) (Val m)
-  Sub1 n m k -> Sub (decompile (k n)) (Val m)
-  Mul1 n m k -> Mul (decompile (k n)) (Val m)
-  Div1 n m k -> Div (decompile (k n)) (Val m)
-  Pow1 n m k -> Pow (decompile (k n)) (Val m)
+  Add1 n m k -> Add (Val n) (decompile (k m))
+  Sub1 n m k -> Sub (decompile (k n)) (decompile (k m))
+  Mul1 n m k -> Mul (Val n) (decompile (k m))
+  Div1 n m k -> Div (decompile (k n)) (decompile (k m))
+  Pow1 n m k -> Pow (decompile (k n)) (decompile (k m))
 
 -- interpreter that evaluates the program as an expression
 eval :: Program Int -> IO Int
@@ -254,6 +255,8 @@ eval (Free (InR x)) = case x of
 -- interpreter that pretty prints the program
 -- The program is sequential so pretty printing is still not figure out yet
 -- Probably need to decompile the program back into an abstract syntax tree
+--
+-- I don't think this is possible since the program is a linear structure
 showProgram :: Program Int -> String
 showProgram (Pure n) = show n
 showProgram (Free (InR x)) = case x of
@@ -267,15 +270,6 @@ showProgram (Free (InR x)) = case x of
   (Mul1 n m k) ->
     let g = showProgram . k
      in wrap $ g n ++ "*" ++ show m
-
-{-
-  Val1 n k -> showProgram . k $ n
-  Add1 n m k -> showProgram (k n) ++ "+" ++ show m
-  Sub1 n m k -> showProgram (k n) ++ "-" ++ show m
-  Mul1 n m k -> showProgram (k n) ++ "*" ++ show m
-  Div1 n m k -> showProgram (k n) ++ "/" ++ show m
-  Pow1 n m k -> showProgram (k n) ++ "^" ++ show m
--}
 
 -- interpreter that steps through the program
 stepProgram :: Program Int -> String
@@ -317,6 +311,9 @@ dflags = CompileFlags True True True
 run :: CompileFlags -> String -> IO Int
 run o = eval . compile o . parse1
 
+rund :: String -> IO Int
+rund = run dflags
+
 pretty :: String -> IO ()
 pretty = putStrLn . showProgram . compile dflags . parse1
 
@@ -324,4 +321,4 @@ step :: String -> IO ()
 step = putStrLn . stepProgram . compile dflags . parse1
 
 decomp :: String -> Tree
-decomp = decompile . compile dflags . parse1
+decomp = decompile . compile (CompileFlags False False False) . parse1

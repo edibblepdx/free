@@ -15,7 +15,7 @@ instance (Functor f) => Applicative (Free f) where
   Free ma <*> b = Free $ (<*> b) <$> ma
 
 instance (Functor f) => Monad (Free f) where
-  return = Pure
+  -- return = Pure
   Pure a >>= f = f a
   Free m >>= f = Free ((>>= f) <$> m)
 
